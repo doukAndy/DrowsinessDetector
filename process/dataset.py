@@ -5,16 +5,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch.utils.data import TensorDataset
+from experiment.config import Config
+
+cfg = Config()
 
 
 class EEGdata():
-    def __init__(self, nSub, p) -> None:
+    def __init__(self, nSub) -> None:
         super().__init__()
-        self.dataset_root = '/media/FastData3/douke/data'
-        self.data_from = 'dataset_figshare'
-        self.data_to = 'preprocessed_%s'%p
-        self.subj_num = len(os.listdir(os.path.join(self.dataset_root, self.data_from)))
-        self.state = ['Normal', 'Fatigue']
+        
         self.nSub = nSub
 
     
@@ -25,14 +24,14 @@ class EEGdata():
         return data
     
     
-    def preprocess(self, nsub, s, epoch_duration=4, filt=True, proj=False, visualize=False, save_mat=False):
+    def preprocess(self, nsub, s):
         try:
-            load = loadmat(os.path.join(self.dataset_root, self.data_to, '%d/%s state.mat' %(nsub, s)))
+            load = loadmat(os.path.join(cfg.dataset_root, cfg.data_to, '%d/%s state.mat' %(nsub, s)))
             return load['data'], load['label'][0].transpose()
         except:
-            raw = mne.io.read_raw_cnt(os.path.join(self.dataset_root, self.data_from, '%d/%s state.cnt' %(nsub+1, s)),  
+            raw = mne.io.read_raw_cnt(os.path.join(cfg.dataset_root, cfg.data_from, '%d/%s state.cnt' %(nsub+1, s)),  
                                         eog=('HEOL', 'HEOR', 'VEOU', 'VEOL'), preload=True, data_format='int16')
-            print('preprocessing ', os.path.join(self.dataset_root, self.data_from, '%d/%s state.cnt' %(nsub+1, s)), '...')
+            print('preprocessing ', os.path.join(cfg.dataset_root, cfg.data_from, '%d/%s state.cnt' %(nsub+1, s)), '...')
 
             # set montage
             mapping = {'FP1':'Fp1', 'FP2':'Fp2', 'FZ':'Fz', 'FCZ':'FCz', 'CZ':'Cz', 'CPZ':'CPz', 'PZ':'Pz', 'OZ':'Oz'}
@@ -41,18 +40,18 @@ class EEGdata():
             raw.set_montage(montage)  
             
             # get epochs
-            epochs = mne.make_fixed_length_epochs(raw, duration=epoch_duration, preload=True)
-            epochs = epochs.resample(sfreq=1000//epoch_duration)
+            epochs = mne.make_fixed_length_epochs(raw, duration=cfg.epoch_duration, preload=True)
+            epochs = epochs.resample(sfreq=1000//cfg.epoch_duration)
 
             # set reference channels
             epochs.set_eeg_reference(['A1', 'A2'])  #  All channel data were referenced to two electrically linked mastoids at A1 and A2
 
             # FIR
-            if filt:
+            if cfg.filt:
                 epochs.filter(l_freq=4, h_freq=45)
 
             # EOG SSP
-            if proj:
+            if cfg.proj:
                 '''
                 ref.: Mikko A. Uusitalo and Risto J. Ilmoniemi. 
                 Signal-space projection method for separating MEG or EEG into components. 
@@ -77,7 +76,7 @@ class EEGdata():
             epoched_data = epoched_data[25:125, :]  # 600/epoch_duration
 
             # visualization
-            if visualize:
+            if cfg.visualize:
                 epochs.plot_psd(fmax=60)
                 plt.savefig('./fig/%d_%s_psd.jpg' %(nsub+1, s))
                 plt.close()
@@ -92,11 +91,11 @@ class EEGdata():
                 label = np.ones(epoched_data.shape[0])
 
             # save to .mat
-            if save_mat:
+            if cfg.save_mat:
                 mat = {'data': epoched_data, 'label': label}
-                if not os.path.exists(os.path.join(self.dataset_root, self.data_to, '%d' %(nsub+1))):
-                    os.makedirs(os.path.join(self.dataset_root, self.data_to, '%d' %(nsub+1)))
-                savemat(os.path.join(self.dataset_root, self.data_to, '%d/%s state.mat' %(nsub+1, s)), mat)
+                if not os.path.exists(os.path.join(cfg.dataset_root, cfg.data_to, '%d' %(nsub+1))):
+                    os.makedirs(os.path.join(cfg.dataset_root, cfg.data_to, '%d' %(nsub+1)))
+                savemat(os.path.join(cfg.dataset_root, cfg.data_to, '%d/%s state.mat' %(nsub+1, s)), mat)
 
             return epoched_data, label
 
@@ -106,8 +105,8 @@ class EEGdata():
         self.train_data, self.test_data = [], []
         self.train_label, self.test_label = [], []
         
-        for s in self.state:
-            for nsub in range(self.subj_num):
+        for s in cfg.state:
+            for nsub in range(cfg.subj_num):
                 epoched_data, label = self.preprocess(nsub+1, s)
                 if (nsub+1) == self.nSub:
                     self.test_data.append(epoched_data)
@@ -143,12 +142,14 @@ class EEGdata():
         return train_dataset, test_dataset
 
 
-    def interaug(self, batch_size):  
+    def interaug(self):  
         '''
         Segmentation and Reconstruction (S&R) data augmentation
 
         return: augmented np.array of shape (int(batch_size / 2), 1, 36, 1000), adn its label
         '''
+        batch_size = cfg.batch_size
+
         aug_data = []
         aug_label = []
         for cls4aug in range(2):

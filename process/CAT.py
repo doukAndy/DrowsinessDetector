@@ -5,60 +5,32 @@ Code: Class activation map (CAM) and then CAT
 refer to high-star repo on github: 
 https://github.com/WZMIAOMIAO/deep-learning-for-image-processing/tree/master/pytorch_classification/grad_cam
 
-Salute every open-source researcher and developer!
 """
-
-
-import argparse
 import os
 gpus = [0]
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, gpus))
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import numpy as np
-import math
-import glob
-import random
-import itertools
-import datetime
-import time
-import datetime
-import sys
 import scipy.io
-
-from torch.utils.data import DataLoader
-from torch.autograd import Variable
-# from torchsummary import summary
-import torch.autograd as autograd
 
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
 import torch.nn.init as init
 
-from torch.utils.data import Dataset
-from PIL import Image
-# from sklearn.decomposition import PCA
-
-import torch
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
-from torch import nn
-from torch import Tensor
-from PIL import Image
 from einops import rearrange, reduce, repeat
-from einops.layers.torch import Rearrange, Reduce
-# from common_spatial_pattern import csp
-
-import matplotlib.pyplot as plt
 from torch.backends import cudnn
-# from tSNE import plt_tsne
-# from grad_cam.utils import GradCAM, show_cam_on_image
 import mne
 from matplotlib import mlab as mlab
 from utils import GradCAM, show_cam_on_image
-from cross_DD_conformer import Conformer
+
+from model.model import Conformer
+from experiment.config import Config
+
+cfg = Config()
 
 cudnn.benchmark = False
 cudnn.deterministic = True
@@ -70,7 +42,6 @@ def reshape_transform(tensor):
     return result
 
 
-state = ['Normal', 'Fatigue']
 preprocessing = ['raw', 'proj']
 device = torch.device("cpu")
 model = Conformer()
@@ -90,14 +61,14 @@ for nSub in range(12):
         # model.load_state_dict(torch.load('./model/model_cnn.pth', map_location=device))
         # target_layers = [model[0].projection]  # set the layer you want to visualize, you can use torchsummary here to find the layer index
         # cam = GradCAM(model=model, target_layers=target_layers, use_cuda=False)
-        model.load_state_dict(torch.load('./model/sub%d_%s.pth'%(nSub+1, p), map_location=device))
+        model.load_state_dict(torch.load(os.path.join(cfg.model_dir, 'sub%d_%s.pth'%(nSub+1, p), map_location=device)))
         target_layers = [model[0].shallownet, model[1]]  # set the target layer 
         cam1 = GradCAM(model=model, target_layers=target_layers[0], use_cuda=False)
         cam2 = GradCAM(model=model, target_layers=target_layers[1], use_cuda=False, reshape_transform=reshape_transform)
 
         data = []
-        for s in state:
-            load = scipy.io.loadmat(os.path.join('/media/FastData3/douke/data/preprocessed_%s'%p, '%d/%s state.mat' %(nSub+1, s)))
+        for s in cfg.state:
+            load = scipy.io.loadmat(os.path.join(cfg.dataset_root, 'preprocessed_%s'%p, '%d/%s state.mat' %(nSub+1, s)))
             data.append(load['data'])
             # load['label'][0].transpose()
         data = np.expand_dims(np.concatenate(data), axis=1)
