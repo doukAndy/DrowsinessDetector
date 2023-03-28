@@ -4,10 +4,9 @@ import torch.nn as nn
 class Config:
     def __init__(self):
         
-        self.batch_size = 72
+        self.batch_size = 64
         self.start_epoch = 0
         self.n_epochs = 50
-        self.c_dim = 4
         self.lr = 0.0002
         self.b1 = 0.5
         self.b2 = 0.999
@@ -17,7 +16,7 @@ class Config:
         self.cross_entropy = nn.CrossEntropyLoss().cuda()
 
         self.result_dir = './result'
-        self.log_dir = './results/log'
+        self.log_dir = './result/log'
         self.model_dir = './model/saved_models'
         self.dataset_root = './data'
         self.data_from = 'dataset_figshare'
@@ -43,5 +42,6 @@ class Config:
         self.proj = False
         self.visualize = False
         self.save_mat = True
+        self.verbose = 'ERROR'
         
         

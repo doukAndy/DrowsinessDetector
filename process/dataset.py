@@ -6,8 +6,8 @@ import numpy as np
 import torch
 from torch.utils.data import TensorDataset
 from experiment.config import Config
-
 cfg = Config()
+mne.set_log_level(verbose=cfg.verbose)
 
 
 class EEGdata():
@@ -29,9 +29,9 @@ class EEGdata():
             load = loadmat(os.path.join(cfg.dataset_root, cfg.data_to, '%d/%s state.mat' %(nsub, s)))
             return load['data'], load['label'][0].transpose()
         except:
-            raw = mne.io.read_raw_cnt(os.path.join(cfg.dataset_root, cfg.data_from, '%d/%s state.cnt' %(nsub+1, s)),  
+            raw = mne.io.read_raw_cnt(os.path.join(cfg.dataset_root, cfg.data_from, '%d/%s state.cnt' %(nsub, s)),  
                                         eog=('HEOL', 'HEOR', 'VEOU', 'VEOL'), preload=True, data_format='int16')
-            print('preprocessing ', os.path.join(cfg.dataset_root, cfg.data_from, '%d/%s state.cnt' %(nsub+1, s)), '...')
+            print('preprocessing ', os.path.join(cfg.dataset_root, cfg.data_from, '%d/%s state.cnt' %(nsub, s)), '...')
 
             # set montage
             mapping = {'FP1':'Fp1', 'FP2':'Fp2', 'FZ':'Fz', 'FCZ':'FCz', 'CZ':'Cz', 'CPZ':'CPz', 'PZ':'Pz', 'OZ':'Oz'}
@@ -62,7 +62,7 @@ class EEGdata():
                     eog_evoked = mne.preprocessing.create_eog_epochs(raw).average(picks='all')
                     eog_evoked.apply_baseline((None, None))
                     mne.viz.plot_projs_joint(eog_projs, eog_evoked, 'eog')
-                    plt.savefig('./fig/%d_%s_proj.jpg' %(nsub+1, s))
+                    plt.savefig('./fig/%d_%s_proj.jpg' %(nsub, s))
                     plt.close()
                     raw.add_proj(eog_projs)
                     raw.apply_proj()
@@ -78,10 +78,10 @@ class EEGdata():
             # visualization
             if cfg.visualize:
                 epochs.plot_psd(fmax=60)
-                plt.savefig('./fig/%d_%s_psd.jpg' %(nsub+1, s))
+                plt.savefig('./fig/%d_%s_psd.jpg' %(nsub, s))
                 plt.close()
                 epochs.plot(n_epochs=7, n_channels=36)
-                plt.savefig('./fig/%d_%s.jpg' %(nsub+1, s))
+                plt.savefig('./fig/%d_%s.jpg' %(nsub, s))
                 plt.close()
 
             # get label
@@ -93,9 +93,9 @@ class EEGdata():
             # save to .mat
             if cfg.save_mat:
                 mat = {'data': epoched_data, 'label': label}
-                if not os.path.exists(os.path.join(cfg.dataset_root, cfg.data_to, '%d' %(nsub+1))):
-                    os.makedirs(os.path.join(cfg.dataset_root, cfg.data_to, '%d' %(nsub+1)))
-                savemat(os.path.join(cfg.dataset_root, cfg.data_to, '%d/%s state.mat' %(nsub+1, s)), mat)
+                if not os.path.exists(os.path.join(cfg.dataset_root, cfg.data_to, '%d' %(nsub))):
+                    os.makedirs(os.path.join(cfg.dataset_root, cfg.data_to, '%d' %(nsub)))
+                savemat(os.path.join(cfg.dataset_root, cfg.data_to, '%d/%s state.mat' %(nsub, s)), mat)
 
             return epoched_data, label
 
@@ -106,9 +106,9 @@ class EEGdata():
         self.train_label, self.test_label = [], []
         
         for s in cfg.state:
-            for nsub in range(cfg.subj_num):
-                epoched_data, label = self.preprocess(nsub+1, s)
-                if (nsub+1) == self.nSub:
+            for i in range(cfg.subj_num):
+                epoched_data, label = self.preprocess(i+1, s)
+                if (i+1) == self.nSub:
                     self.test_data.append(epoched_data)
                     self.test_label.append(label)
                 else:

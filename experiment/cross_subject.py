@@ -1,8 +1,11 @@
-import argparse
 import os
+import sys
+sys.path.append(os.getcwd())
+
 gpus = [0]
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, gpus))
+import argparse
 import numpy as np
 import math
 import glob
@@ -11,7 +14,6 @@ import itertools
 import datetime
 import time
 import datetime
-import sys
 import scipy.io
 
 import torchvision.transforms as transforms
@@ -55,12 +57,12 @@ from process.dataset import EEGdata
 cfg = Config()
 
 class ExP():
-    def __init__(self, nsub):
+    def __init__(self, nSub):
         super(ExP, self).__init__()
         
-        self.nSub = nsub
-        self.log_write = open(os.path.join(cfg.log_dir, "log_sub_%d.txt" % nsub), "w")
-        self.dataset = EEGdata(nsub)
+        self.nSub = nSub
+        self.log_write = open(os.path.join(cfg.log_dir, "log_sub_%d.txt" % nSub), "w")
+        self.dataset = EEGdata(nSub)
 
         self.model = Conformer().cuda()
         self.model = nn.DataParallel(self.model, device_ids=[i for i in range(len(gpus))])
@@ -74,19 +76,14 @@ class ExP():
         self.train_loader = DataLoader(dataset=train_dataset, batch_size=cfg.batch_size, shuffle=True)
         self.test_loader = DataLoader(dataset=test_dataset, batch_size=200, shuffle=True)
 
-        # Optimizers
-        
-        test_data = Variable(test_data.type(FloatTensor))
-        test_label = Variable(test_label.type(LongTensor))
-
-        
+               
         curr_lr = cfg.lr
         bestAcc,  averAcc = 0, 0
         Y_true, Y_pred = 0, 0
         for e in range(cfg.n_epochs):
 
             if (e + 1) % 10 == 0: curr_lr *= 0.1
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=curr_lr, betas=(self.b1, self.b2))
+            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=curr_lr, betas=(cfg.b1, cfg.b2))
 
             self.model.train()
             for i, (img, label) in enumerate(self.train_loader):
@@ -112,6 +109,9 @@ class ExP():
 
             self.model.eval()
             for (test_data, test_label) in self.test_loader:
+                test_data = Variable(test_data.type(FloatTensor))
+                test_label = Variable(test_label.type(LongTensor))
+                
                 Tok, Cls = self.model(test_data)
                 y_pred = torch.max(Cls, 1)[1]
                 acc = float((y_pred == test_label).cpu().numpy().astype(int).sum()) / float(test_label.size(0))
@@ -164,7 +164,7 @@ def main():
 
         print('Subject %d' % (i+1))
 
-        exp = ExP(i + 1)
+        exp = ExP(i+1)
         bestAcc, averAcc, Y_true, Y_pred = exp.train()
         
         print('THE BEST ACCURACY IS ' + str(bestAcc))
