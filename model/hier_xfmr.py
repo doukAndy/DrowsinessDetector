@@ -286,9 +286,9 @@ class HierXFMR(nn.Module):
     def forward(self, x):
         x = self.tokenizer(x)
         llt, batch, x = self.lowlevel(x)
-        hlt, score = self.highlevel((x, batch))    #score 삭제
+        hlt, score = self.highlevel((x, batch))    
 
-        return hlt  # llt, hlt, score # score 삭제
+        return hlt  # llt, hlt, score 
 
     def llt_freeze(self):
         for param in self.tokenizer.parameters():
