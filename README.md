@@ -31,12 +31,12 @@ data/
 *[Hierarchical Transformer](https://ieeexplore.ieee.org/document/10078473), a relatively new research without official open source.
 
 ### experiment
-*Configurations for the whole experiment are set in ./experiment/config.py.
+*Configurations for the whole experiment are set in `./experiment/config.py`.
 
-*In ./experiment/cross_subject.py, 
+*In `./experiment/cross_subject.py`, 
 
     **EEG signals from all subjects are used for training and validating (3:1) except the 1st and the 2nd subjects' (used for testing).
 
     **3 models are trained and saved and tested.
 
-    **results and some figures are in ./result.
+    **results and some figures are in `./result`.
