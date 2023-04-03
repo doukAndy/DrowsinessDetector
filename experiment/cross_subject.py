@@ -5,146 +5,165 @@ sys.path.append(os.getcwd())
 gpus = [0]
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
 os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, gpus))
-import argparse
 import numpy as np
-import math
-import glob
 import random
-import itertools
-import datetime
 import time
 import datetime
-import scipy.io
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import itertools
 
-import torchvision.transforms as transforms
-from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 import torch.nn as nn
-import torch.nn.functional as F
-import torch
-import torch.nn.init as init
-
-from torch.utils.data import Dataset
-from PIL import Image
-import torchvision.transforms as transforms
-
 import torch
 from torch.cuda import FloatTensor, LongTensor
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
-
-from torch import nn
-from torch import Tensor
-from PIL import Image
-from torchvision.transforms import Compose, Resize, ToTensor
-from einops import rearrange, reduce, repeat
-from einops.layers.torch import Rearrange, Reduce
-# from common_spatial_pattern import csp
-
-import matplotlib.pyplot as plt
-# from torch.utils.tensorboard import SummaryWriter
+from torch.nn.modules.module import _addindent
 from torch.backends import cudnn
 cudnn.benchmark = False
 cudnn.deterministic = True
 
 from config import Config
-from model.model import Conformer
+from model.conformer import Conformer
+from model.eegnet import EEGNet
+from model.hier_xfmr import HierXFMR
 from process.dataset import EEGdata
+from utils import confusion_matplotter, torch_summarize, cam_ploter
+
 
 
 cfg = Config()
 
+
 class ExP():
-    def __init__(self, nSub):
+    def __init__(self, models):
         super(ExP, self).__init__()
         
-        self.nSub = nSub
-        self.log_write = open(os.path.join(cfg.log_dir, "log_sub_%d.txt" % nSub), "w")
-        self.dataset = EEGdata(nSub)
-
-        self.model = Conformer().cuda()
-        self.model = nn.DataParallel(self.model, device_ids=[i for i in range(len(gpus))])
-        self.model = self.model.cuda()
+        self.models = models 
+        self.dataset = EEGdata() 
+        self.report_writer = open(os.path.join(cfg.result_dir, 'report.txt'), "w")
 
         
     def train(self):
         
-        train_dataset, test_dataset = self.dataset.get_data()
+        train_dataset, valid_dataset = self.dataset.get_train_val_set()
 
-        self.train_loader = DataLoader(dataset=train_dataset, batch_size=cfg.batch_size, shuffle=True)
-        self.test_loader = DataLoader(dataset=test_dataset, batch_size=200, shuffle=True)
+        self.train_loader = DataLoader(dataset=train_dataset, batch_size=cfg.batch_size, shuffle=True, drop_last=True)
+        self.valid_loader = DataLoader(dataset=valid_dataset, batch_size=500, shuffle=True)
+        num_train_iter = len(self.train_loader)
+        num_valid_iter = len(self.valid_loader)
 
-               
-        curr_lr = cfg.lr
-        bestAcc,  averAcc = 0, 0
-        Y_true, Y_pred = 0, 0
-        for e in range(cfg.n_epochs):
+        for k, model in enumerate(self.models):
+            name = model.name
+            print('training %s ...\n' %name)
+            log_writer = open(os.path.join(cfg.log_dir, '%s.txt' % name), "w")
+            model = nn.DataParallel(model.cuda(), device_ids=[i for i in range(len(gpus))]).cuda()
+            curr_lr = cfg.lr
+            max_valid_acc = 0
+            max_acc_e = 0
+            for e in range(cfg.n_epochs):
+                ## TRAIN
+                model.train()
 
-            if (e + 1) % 10 == 0: curr_lr *= 0.1
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=curr_lr, betas=(cfg.b1, cfg.b2))
+                if (e + 1) % cfg.milestone == 0: curr_lr *= 0.1
+                self.optimizer = torch.optim.Adam(model.parameters(), lr=curr_lr, betas=(cfg.b1, cfg.b2))
 
-            self.model.train()
-            for i, (img, label) in enumerate(self.train_loader):
+                train_acc, train_loss = 0, 0
+                for (img, label) in self.train_loader:
+                    
+                    matrix, loss = self.evaluate_iter(img, label, model, aug=True)
+                                       
+                    self.optimizer.zero_grad()
+                    loss.backward()
+                    self.optimizer.step()
+                    train_loss += loss.detach().cpu().numpy()
 
-                img = Variable(img.cuda().type(FloatTensor))
-                label = Variable(label.cuda().type(LongTensor))
+                    [[tn, fp], [fn, tp]] = matrix
+                    train_acc += tp / (tp + fp + 1e-10)
+                    
+                train_loss /= num_train_iter
+                train_acc /= num_train_iter
 
-                # data augmentation
-                aug_data, aug_label = self.dataset.interaug()
-                img = torch.cat((img, aug_data))
-                label = torch.cat((label, aug_label))
+                ## VALID
+                model.eval()
 
+                valid_acc, valid_loss = 0, 0
+                for (img, label) in self.valid_loader:
 
-                tok, outputs = self.model(img)
-                train_pred = torch.max(outputs, 1)[1]
-                train_acc = float((train_pred == label).cpu().numpy().astype(int).sum()) / float(label.size(0))
+                    matrix, loss = self.evaluate_iter(img, label, model)
+                    
+                    [[tn, fp], [fn, tp]] = matrix
+                    valid_acc += tp / (tp + fp)
+                    valid_loss += loss
 
-                loss = cfg.cross_entropy(outputs, label) 
-                self.optimizer.zero_grad()
-                loss.backward()
-                self.optimizer.step()
+                valid_loss /= num_valid_iter
+                valid_acc /= num_valid_iter
 
-
-            self.model.eval()
-            for (test_data, test_label) in self.test_loader:
-                test_data = Variable(test_data.type(FloatTensor))
-                test_label = Variable(test_label.type(LongTensor))
-                
-                Tok, Cls = self.model(test_data)
-                y_pred = torch.max(Cls, 1)[1]
-                acc = float((y_pred == test_label).cpu().numpy().astype(int).sum()) / float(test_label.size(0))
-
-                loss_test = cfg.cross_entropy(Cls, test_label)
-
-                msg = 'Epoch: %4d' %e +\
-                        '  Train loss: %.3f' % loss.detach().cpu().numpy() +\
-                        '  Test loss: %.3f' % loss_test.detach().cpu().numpy() +\
-                        '  Train accuracy %.3f' % train_acc +\
-                        '  Test accuracy is %.3f' % acc
-    
+                msg = 'Epoch: %4d' %(e+1) +\
+                        '  train loss: %.3f' % (train_loss) +\
+                        '  valid loss: %.3f' % (valid_loss) +\
+                        '  train accuracy: %.3f' % (train_acc) +\
+                        '  valid accuracy: %.3f' % (valid_acc)
+        
                 print(msg)
-                self.log_write.write(msg + '\n')
-
-                averAcc = averAcc + acc
-                if acc > bestAcc:
-                    bestAcc = acc
-                    Y_true = test_label
-                    Y_pred = y_pred
-        averAcc = averAcc / cfg.n_epochs
-
-
-        torch.save(self.model.module.state_dict(), os.path.join(cfg.model_dir, 'model_subj_%d' % self.nSub))
+                log_writer.write(msg + '\n')
+                
+                if valid_acc > max_valid_acc:
+                    max_valid_acc = valid_acc
+                    max_acc_e = e
+                    torch.save(model.module.state_dict(), os.path.join(cfg.model_dir, '%s.pth' % name))
+            log_writer.write('\n** max_valid_acc = %.3f when epoch = %d' %(max_valid_acc, max_acc_e))
+            self.report_writer.write('\n** %s: \n\tmax_valid_acc = %.3f when epoch = %d' %(name, max_valid_acc, max_acc_e))
+        log_writer.close()
         
-        print('avg acc:  ', averAcc)
-        print('best acc: ', bestAcc)
-        self.log_write.write('avg acc:  ' + str(averAcc) + "\n")
-        self.log_write.write('best acc: ' + str(bestAcc) + "\n")
-        self.log_write.close()
 
-        return bestAcc, averAcc, Y_true, Y_pred
+    def test(self, nsub, visualization=True):
+        test_dataset = self.dataset.get_test_set(nsub)
+        test_loader = DataLoader(dataset=test_dataset, batch_size=200, shuffle=True)
+
+        test_loss = 0
+        confusion = np.zeros((3, 2, 2))
+        subtitles = list()
+        for k, model in enumerate(self.models):
+            model.load_state_dict(torch.load(os.path.join(cfg.model_dir, '%s.pth' % model.name), map_location=cfg.device))
+            model = model.cuda()
+            self.report_writer = open(os.path.join(cfg.result_dir, 'report.txt'), "w")
+            self.report_writer.write('\n' + torch_summarize(model))
+            for (img, label) in test_loader:
+                matrix, loss = self.evaluate_iter(img, label, model, nsub=nsub)
+                confusion[k] += matrix
+                test_loss += loss
+                
+            test_loss /= len(test_loader)
+            confusion[k] /= len(test_loader)
+            subtitles.append(model.name)
+            
+            print('\t%s: ' % model.name + str(confusion[k]))
+            self.report_writer.write('\t%s: ' % model.name + str(confusion[k]))
+        confusion_matplotter(confusion, subtitles, flag=nsub)
+        self.report_writer.close()
+        return confusion
+
+
+    def evaluate_iter(self, img, label, model, aug=False, nsub=None):
+        img = Variable(img.cuda().type(FloatTensor))
+        # label = Variable(label.cuda().type(LongTensor))
+        # label = torch.stack((1-label, label), dim=1)
+        label = Variable(label.cuda().type(FloatTensor))
+        if nsub: cam_ploter(img, model, nsub)
+        if aug == True:
+            aug_data, aug_label = self.dataset.interaug()
+            img = torch.cat((img, aug_data))
+            label = torch.cat((label, aug_label))
         
+        outputs = model(img)
+        y_pred = torch.max(outputs, 1)[1].cpu().numpy().astype(int)
+        matrix = confusion_matrix(label[:, 1].cpu().numpy(), y_pred)
+        loss = cfg.criterion_cls(outputs, label)
+
+        return matrix, loss
+
+
 
 def main():
 
@@ -156,41 +175,22 @@ def main():
     torch.cuda.manual_seed(seed_n)
     torch.cuda.manual_seed_all(seed_n)
 
-    result_write = open(os.path.join(cfg.result_dir, 'result.txt'), "w")
+    
 
-    best, aver = 0, 0
-    for i in range(cfg.subj_num):
-        starttime = datetime.datetime.now()
+    models = [EEGNet(), Conformer(), HierXFMR()]
+    exp = ExP(models)
 
+    # exp.train()
+
+    for i in range(2):       
         print('Subject %d' % (i+1))
-
-        exp = ExP(i+1)
-        bestAcc, averAcc, Y_true, Y_pred = exp.train()
-        
-        print('THE BEST ACCURACY IS ' + str(bestAcc))
-        result_write.write('Subject ' + str(i + 1) + ' :   best acc %.3f' %(bestAcc) + '      avg acc %.3f' %(averAcc) + "\n")
-
-        endtime = datetime.datetime.now()
-        print('subject %d duration: '%(i+1) + str(endtime - starttime))
-        best = best + bestAcc
-        aver = aver + averAcc
-        if i == 0:
-            yt = Y_true
-            yp = Y_pred
-        else:
-            yt = torch.cat((yt, Y_true))
-            yp = torch.cat((yp, Y_pred))
-
-
-    best = best / cfg.subj_num
-    aver = aver / cfg.subj_num
-
-    result_write.write('**The average Best accuracy is: ' + str(best) + "\n")
-    result_write.write('**The average Aver accuracy is: ' + str(aver) + "\n")
-    result_write.close()
+        confusion = exp.test(i+1)
+ 
 
 
 if __name__ == "__main__":
-    print(time.asctime(time.localtime(time.time())))
     main()
-    print(time.asctime(time.localtime(time.time())))
+    # print(time.asctime(time.localtime(time.time())))
+    # starttime = datetime.datetime.now()
+    # endtime = datetime.datetime.now()
+    # add noise

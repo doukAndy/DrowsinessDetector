@@ -1,20 +1,11 @@
 import os
+import torch
 import torch.nn as nn
+
 
 class Config:
     def __init__(self):
-        
-        self.batch_size = 64
-        self.start_epoch = 0
-        self.n_epochs = 50
-        self.lr = 0.0002
-        self.b1 = 0.5
-        self.b2 = 0.999
-
-        self.criterion_l1 = nn.L1Loss().cuda()
-        self.criterion_l2 = nn.MSELoss().cuda()
-        self.cross_entropy = nn.CrossEntropyLoss().cuda()
-
+        # set path:
         self.result_dir = './result'
         self.log_dir = './result/log'
         self.model_dir = './model/saved_models'
@@ -31,17 +22,80 @@ class Config:
                            'Then try to run again.' %(os.path.join(self.dataset_root, self.data_from)))
         if not os.path.exists(os.path.join(self.dataset_root, self.data_to)): 
             os.mkdir(os.path.join(self.dataset_root, self.data_to))
-            
-        self.state = ['Normal', 'Fatigue']
-        self.subj_num = len(os.listdir(os.path.join(self.dataset_root, self.data_from)))
- 
-        # preprocessing config:
-        self.epoch_duration = 4  # downsample to 250Hz
-        self.filt = True
+
+        # preprocessing configuration:
+        self.samples = 1000              # samples per epoch
+        self.epoch_duration = 4          # duration(4s) per epoch, ths downsampling to 250Hz
+        self.get_time = range(25, 125)   # total: 600s, getting 600/epoch_duration = 150 epochs
         self.lfreq, self.hfreq = 4, 45
+        self.filt = True
         self.proj = False
         self.visualize = False
         self.save_mat = True
         self.verbose = 'ERROR'
+
+        # data discription:
+        self.state = ['Normal', 'Fatigue']
+        self.subj_num = len(os.listdir(os.path.join(self.dataset_root, self.data_from)))
+        self.fs = 250  # self.samples/self.epoch_duration
+        self.channels = 36
+        self.n_classes = 2
         
+        # training:
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
+        self.batch_size = 64
+        
+        self.start_epoch = 0
+        self.n_epochs = 100
+        
+        self.lr = 0.0002
+        self.milestone = 10
+        
+        self.b1 = 0.5
+        self.b2 = 0.999
+
+        self.criterion_l1 = nn.L1Loss().cuda()
+        self.criterion_l2 = nn.MSELoss().cuda()
+        self.criterion_cls = nn.BCEWithLogitsLoss().cuda()  # nn.CrossEntropyLoss(label_smoothing=0.1).cuda()  # nn.BCEWithLogitsLoss().cuda()
+
+        # configuration of EEGNet
+        self.dropout_e = 0.5
+        self.kernel_len1 = int(0.5 * self.fs)
+        self.kernel_len2 = 25
+        self.F1 = 8
+        self.F2 = 16
+        self.D = 2
+
+        # configuration of Conformer
+        self.dropout_c = 0.5
+        self.emb_size = 20
+        self.depth = 3
+        self.kernel_len = 25
+        self.n_kernels = 20
+        self.pool_len = 75
+        self.pool_stride = 15
+        self.num_heads = 2
+        self.forward_expansion = 2
+        self.num_tokens = 61
+
+        # configuration of Hierarchical Transformer
+        self.seq_len_hlt = 39
+        self.patch_len = 5
+        self.num_layers = 2
+        self.sliding_window = 20
+        self.d_model = 180
+        self.nhead = 2
+        self.dropout = 0.1
+        self.norm = None
+        self.mode1 = 'global'
+        self.mode2 = 'class'
+        self.train_mode = 'llt'
+        self.how_train = 'fixed'
+        self.use_HT = True
+        self.eval_subject = 1
+
+        # # configuration of EEG-Inception
+        # self.scales_samples = self.fs * [0.5, 0.25, 0.125]
+        # self.filter_per_branch = 8
+        # self.dropout_rate = 0.25

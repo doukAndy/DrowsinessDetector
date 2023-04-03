@@ -1,0 +1,108 @@
+
+HierXFMR (
+  (tokenizer): Tokenizer(
+    (patching): Patching(
+      (patch_1D): Rearrange('b h c (s d) -> (b h s) (d c)', d=5)
+    )
+  ), weights=(), parameters=0
+  (lowlevel): LowLevelTransformer(
+    (transformer): TransformerEncoder(
+      (encoder_layer): TransformerEncoderLayer(
+        (self_attn): MultiHeadAttention(
+          (out_proj): NonDynamicallyQuantizableLinear(in_features=180, out_features=180, bias=True)
+        )
+        (linear1): Linear(in_features=180, out_features=180, bias=True)
+        (dropout): Dropout(p=0.1, inplace=False)
+        (linear2): Linear(in_features=180, out_features=180, bias=True)
+        (norm1): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+        (norm2): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+        (dropout1): Dropout(p=0.1, inplace=False)
+        (dropout2): Dropout(p=0.1, inplace=False)
+        (activation): GELU()
+      )
+      (layers): ModuleList(
+        (0): TransformerEncoderLayer(
+          (self_attn): MultiHeadAttention(
+            (out_proj): NonDynamicallyQuantizableLinear(in_features=180, out_features=180, bias=True)
+          )
+          (linear1): Linear(in_features=180, out_features=180, bias=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+          (linear2): Linear(in_features=180, out_features=180, bias=True)
+          (norm1): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+          (norm2): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+          (dropout1): Dropout(p=0.1, inplace=False)
+          (dropout2): Dropout(p=0.1, inplace=False)
+          (activation): GELU()
+        )
+        (1): TransformerEncoderLayer(
+          (self_attn): MultiHeadAttention(
+            (out_proj): NonDynamicallyQuantizableLinear(in_features=180, out_features=180, bias=True)
+          )
+          (linear1): Linear(in_features=180, out_features=180, bias=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+          (linear2): Linear(in_features=180, out_features=180, bias=True)
+          (norm1): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+          (norm2): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+          (dropout1): Dropout(p=0.1, inplace=False)
+          (dropout2): Dropout(p=0.1, inplace=False)
+          (activation): GELU()
+        )
+      )
+    )
+    (head): Head(
+      (norm): LayerNorm((180,), eps=1e-06, elementwise_affine=True)
+      (mlp): Linear(in_features=180, out_features=2, bias=True)
+    )
+  ), weights=((540, 180), (540,), (180, 180), (180,), (180, 180), (180,), (180, 180), (180,), (180,), (180,), (180,), (180,), (540, 180), (540,), (180, 180), (180,), (180, 180), (180,), (180, 180), (180,), (180,), (180,), (180,), (180,), (540, 180), (540,), (180, 180), (180,), (180, 180), (180,), (180, 180), (180,), (180,), (180,), (180,), (180,), (180,), (180,), (2, 180), (2,)), parameters=589322
+  (highlevel): HighLevelTransformer(
+    (transformer): TransformerEncoder(
+      (encoder_layer): TransformerEncoderLayer(
+        (self_attn): MultiHeadAttention(
+          (out_proj): NonDynamicallyQuantizableLinear(in_features=180, out_features=180, bias=True)
+        )
+        (linear1): Linear(in_features=180, out_features=180, bias=True)
+        (dropout): Dropout(p=0.1, inplace=False)
+        (linear2): Linear(in_features=180, out_features=180, bias=True)
+        (norm1): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+        (norm2): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+        (dropout1): Dropout(p=0.1, inplace=False)
+        (dropout2): Dropout(p=0.1, inplace=False)
+        (activation): GELU()
+      )
+      (layers): ModuleList(
+        (0): TransformerEncoderLayer(
+          (self_attn): MultiHeadAttention(
+            (out_proj): NonDynamicallyQuantizableLinear(in_features=180, out_features=180, bias=True)
+          )
+          (linear1): Linear(in_features=180, out_features=180, bias=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+          (linear2): Linear(in_features=180, out_features=180, bias=True)
+          (norm1): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+          (norm2): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+          (dropout1): Dropout(p=0.1, inplace=False)
+          (dropout2): Dropout(p=0.1, inplace=False)
+          (activation): GELU()
+        )
+        (1): TransformerEncoderLayer(
+          (self_attn): MultiHeadAttention(
+            (out_proj): NonDynamicallyQuantizableLinear(in_features=180, out_features=180, bias=True)
+          )
+          (linear1): Linear(in_features=180, out_features=180, bias=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+          (linear2): Linear(in_features=180, out_features=180, bias=True)
+          (norm1): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+          (norm2): LayerNorm((180,), eps=1e-05, elementwise_affine=True)
+          (dropout1): Dropout(p=0.1, inplace=False)
+          (dropout2): Dropout(p=0.1, inplace=False)
+          (activation): GELU()
+        )
+      )
+    )
+    (head): Head(
+      (norm): LayerNorm((180,), eps=1e-06, elementwise_affine=True)
+      (mlp): Linear(in_features=180, out_features=2, bias=True)
+    )
+    (position_embedding): PositionEmbedding()
+  ), weights=((1, 1, 180), (540, 180), (540,), (180, 180), (180,), (180, 180), (180,), (180, 180), (180,), (180,), (180,), (180,), (180,), (540, 180), (540,), (180, 180), (180,), (180, 180), (180,), (180, 180), (180,), (180,), (180,), (180,), (180,), (540, 180), (540,), (180, 180), (180,), (180, 180), (180,), (180, 180), (180,), (180,), (180,), (180,), (180,), (180,), (180,), (2, 180), (2,), (1, 40, 180)), parameters=596702
+)	HierXFMR: [[30. 70.]
+ [26. 74.]]
