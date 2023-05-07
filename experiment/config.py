@@ -26,11 +26,11 @@ class Config:
         # preprocessing configuration:
         self.samples = 1000              # samples per epoch
         self.epoch_duration = 4          # duration(4s) per epoch, ths downsampling to 250Hz
-        self.get_time = range(25, 125)   # total: 600s, getting 600/epoch_duration = 150 epochs
+        self.get_time = list(range(25, 125))   # total: 600s, getting 600/epoch_duration = 150 epochs
         self.lfreq, self.hfreq = 4, 45
         self.filt = True
         self.proj = False
-        self.visualize = False
+        self.visualize = True
         self.save_mat = True
         self.verbose = 'ERROR'
 
@@ -44,7 +44,7 @@ class Config:
         # training:
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         
-        self.batch_size = 64
+        self.batch_size = 32
         
         self.start_epoch = 0
         self.n_epochs = 100
@@ -66,25 +66,27 @@ class Config:
         self.F1 = 8
         self.F2 = 16
         self.D = 2
+        self.pool_1 = 5
+        self.pool_2 = 25
 
         # configuration of Conformer
         self.dropout_c = 0.5
-        self.emb_size = 20
+        self.emb_size = 16
         self.depth = 3
         self.kernel_len = 25
-        self.n_kernels = 20
-        self.pool_len = 75
-        self.pool_stride = 15
+        self.n_kernels = 8
+        self.pool_len = 25
+        self.pool_stride = 25
         self.num_heads = 2
         self.forward_expansion = 2
         self.num_tokens = 61
 
         # configuration of Hierarchical Transformer
-        self.seq_len_hlt = 39
-        self.patch_len = 5
+        self.seq_len_hlt = 40
+        self.patch_len = 1
         self.num_layers = 2
-        self.sliding_window = 20
-        self.d_model = 180
+        self.sliding_window = 25
+        self.d_model = 36
         self.nhead = 2
         self.dropout = 0.1
         self.norm = None

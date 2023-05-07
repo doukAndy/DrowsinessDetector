@@ -3,8 +3,8 @@ import sys
 sys.path.append(os.getcwd())
 
 gpus = [0]
-os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, gpus))
+os.environ['_DEVICE_ORDER'] = 'PCI_BUS_ID'
+os.environ["_VISIBLE_DEVICES"] = ','.join(map(str, gpus))
 import numpy as np
 import random
 import time
@@ -57,7 +57,7 @@ class ExP():
             name = model.name
             print('training %s ...\n' %name)
             log_writer = open(os.path.join(cfg.log_dir, '%s.txt' % name), "w")
-            model = nn.DataParallel(model.cuda(), device_ids=[i for i in range(len(gpus))]).cuda()
+            model = nn.DataParallel(model.cuda(), device_ids=[i for i in range(len(gpus))]).()
             curr_lr = cfg.lr
             max_valid_acc = 0
             max_acc_e = 0
@@ -147,7 +147,7 @@ class ExP():
 
     def evaluate_iter(self, img, label, model, aug=False, nsub=None):
         img = Variable(img.cuda().type(FloatTensor))
-        # label = Variable(label.cuda().type(LongTensor))
+        # label = Variable(label.().type(LongTensor))
         # label = torch.stack((1-label, label), dim=1)
         label = Variable(label.cuda().type(FloatTensor))
         if nsub: cam_ploter(img, model, nsub)
@@ -177,7 +177,7 @@ def main():
 
     
 
-    models = [EEGNet(), Conformer(), HierXFMR()]
+    models = [EEGNet(), Conformer(), HierXFMR()]  # 
     exp = ExP(models)
 
     # exp.train()
