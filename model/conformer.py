@@ -13,32 +13,44 @@ from torch.backends import cudnn
 cudnn.benchmark = False
 cudnn.deterministic = True
 
-from experiment.config import Config
+from experiment.config_simplified import Config
 cfg = Config()
 
 
 # writer = SummaryWriter('./TensorBoardX/')
 
+class Conv2dWithConstraint(nn.Conv2d):
+    def __init__(self, *args, max_norm=1, **kwargs) -> None:
+        self.max_norm = max_norm
+        super().__init__(*args, **kwargs)
+
+    def forward(self, x):
+        self.weight.data = torch.renorm(self.weight.data, p=2, dim=0, maxnorm=self.max_norm)
+        return super(Conv2dWithConstraint, self).forward(x)
+
+
 
 # Convolution module
 # use conv to capture local features, instead of postion embedding.
 class PatchEmbedding(nn.Module):
-    def __init__(self, emb_size=40):
+    def __init__(self, emb_size):
         # self.patch_size = patch_size
         super().__init__()
 
         self.shallownet = nn.Sequential(
-            nn.Conv2d(1, cfg.n_kernels, (1, cfg.kernel_len), (1, 1)),
-            nn.Conv2d(cfg.n_kernels, cfg.n_kernels, (cfg.channels, 1), (1, 1)),
-            nn.BatchNorm2d(cfg.n_kernels),
+            nn.Conv2d(1, cfg.n_kernels, (1, cfg.kernel_len), stride=1, padding=(0, cfg.kernel_len // 2), bias=False),
+            nn.BatchNorm2d(cfg.n_kernels, momentum=0.01, affine=True, eps=1e-3),
+            # Conv2dWithConstraint(cfg.n_kernels, cfg.n_kernels * 2, (cfg.channels, 1), max_norm=1, stride=1, padding=(0, 0),
+            #                      groups=cfg.n_kernels, bias=False),
+            # nn.BatchNorm2d(cfg.n_kernels * 2, momentum=0.01, affine=True, eps=1e-3),
             nn.ELU(),
             nn.AvgPool2d((1, cfg.pool_len), (1, cfg.pool_stride)),  
             nn.Dropout(cfg.dropout_c),
         )
 
         self.projection = nn.Sequential(
-            nn.Conv2d(cfg.n_kernels, emb_size, (1, 1), stride=(1, 1)),  # transpose, conv could enhance fiting ability slightly
-            Rearrange('b e (h) (w) -> b (h w) e'),
+            nn.Conv2d(cfg.n_kernels, cfg.n_kernels, (1, 1), stride=(1, 1)), 
+            Rearrange('b k c w -> b c (k w)'),
         )
 
 
@@ -153,8 +165,8 @@ class ClassificationHead(nn.Sequential):
         )
 
     def forward(self, x):
-        x = x.contiguous().view(x.size(0), -1)
-        out = self.fc(x)
+        # x = x.contiguous().view(x.size(0), -1)
+        out = self.clshead(x)
         return out  # , x
 
 

@@ -37,7 +37,7 @@ class EEGdata():
             raw.rename_channels(mapping)
             montage = mne.channels.make_standard_montage('standard_1020')
             raw.set_montage(montage)  
-            
+            # mne.channels.find_layout(raw.info, ch_type='eeg').plot()
             # get epochs
             epochs = mne.make_fixed_length_epochs(raw, duration=cfg.epoch_duration, preload=True)
             epochs = epochs.resample(sfreq=cfg.samples//cfg.epoch_duration)
@@ -71,15 +71,20 @@ class EEGdata():
             # get data
             epochs.pick_types(eeg=True)
             epoched_data = epochs.get_data()
-            epoched_data = np.nan_to_num(epoched_data)  
-            epoched_data = epoched_data[self.get_time, :]  # 600/epoch_duration
+            epoched_data = np.nan_to_num(epoched_data) 
+
+            baseline_num = min(5, cfg.get_time[0])
+            baseline = np.abs(epoched_data[(cfg.get_time[0] - baseline_num): cfg.get_time[0], :])
+            ampmax = np.max(np.max(baseline, axis=-1, keepdims=True), axis=0)
+            
+            epoched_data = epoched_data[cfg.get_time, :] / ampmax  # 600/epoch_duration
 
             # visualization
             if cfg.visualize:
                 epochs.plot_psd(fmax=60)
                 plt.savefig('./fig/%d_%s_psd.jpg' %(nsub, s))
                 plt.close()
-                epochs.plot(n_epochs=7, n_channels=36)
+                epochs[cfg.get_time].plot(n_epochs=5, n_channels=36)
                 plt.savefig('./fig/%d_%s.jpg' %(nsub, s))
                 plt.close()
 

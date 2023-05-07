@@ -6,7 +6,7 @@ from torch.nn import Linear, ELU, Softmax, Dropout
 from torch.nn.modules.module import _addindent
 import numpy as np
 
-from experiment.config import Config
+from experiment.config_simplified import Config
 cfg = Config()
 
 
@@ -29,7 +29,7 @@ class EEGNet(Module):
                                  groups=self.F1, bias=False),
             BatchNorm2d(self.F1 * self.D, momentum=0.01, affine=True, eps=1e-3),
             ELU(),
-            AvgPool2d((1, 5), stride=5),
+            AvgPool2d((1, cfg.pool_1), stride=cfg.pool_1),
             Dropout(p=dropoutRate))
         block2 = Sequential(
             # SeparableConv2D =======================
@@ -40,7 +40,7 @@ class EEGNet(Module):
 
             BatchNorm2d(self.F2, momentum=0.01, affine=True, eps=1e-3),
             ELU(),
-            AvgPool2d((1, 25), stride=25),
+            AvgPool2d((1, cfg.pool_2), stride=cfg.pool_2),
             Dropout(p=dropoutRate))
         return Sequential(block1, block2)
 
